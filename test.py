@@ -8,7 +8,8 @@ import torch
 test_dataset = get_random_percentage_subset(CNN_DailyMail_Dataset(split="test"), 1)
 test_loader = DataLoader(test_dataset, batch_size=2)
 
-checkpoint = torch.load("/teamspace/studios/this_studio/lightning_logs/version_62/checkpoints/best-checkpoint-epoch=04-val_rougeL=0.14.ckpt")
+checkpoint_path = "/teamspace/studios/this_studio/lightning_logs/version_2/checkpoints/best-checkpoint-epoch=05-val_rougeL=0.14.ckpt"
+checkpoint = torch.load(checkpoint_path, map_location="cpu")  # Load to CPU
 
 epoch = checkpoint['epoch']
 global_step = checkpoint['global_step']
@@ -19,7 +20,7 @@ lr_schedulers = checkpoint['lr_schedulers']
 loops = checkpoint['loops']
 callbacks = checkpoint['callbacks']
 
-model = GPT2FineTuner(model_name="gpt2", lr=5e-5)
+model = FineTuner(model_name="gpt2", lr=5e-5)
 
 model.load_state_dict(state_dict)
 

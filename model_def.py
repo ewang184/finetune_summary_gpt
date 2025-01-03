@@ -1,26 +1,26 @@
 import torch
 import pytorch_lightning as pl
-from transformers import AutoModelForCausalLM
+from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM
 from peft import LoraConfig, get_peft_model
 from evaluate import load
 from transformers import AutoTokenizer, AddedToken
 import os 
 
-class GPT2FineTuner(pl.LightningModule):
-    def __init__(self, model_name="gpt2", lr=5e-5):
-        super(GPT2FineTuner, self).__init__()
-        model = AutoModelForCausalLM.from_pretrained(model_name)
-        target_modules = [
-            "attn.c_attn", 
-            "attn.c_proj", 
-        ]
+class FineTuner(pl.LightningModule):
+    def __init__(self, model_name="facebook/bart-base", lr=5e-5):
+        super(FineTuner, self).__init__()
+        model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+
+        if "facebook/bart" in model_name:
+            target_modules = ["q_proj", "k_proj", "v_proj", "out_proj"]
+
         lora_config = LoraConfig(
-            r=8,
+            r=16,
             lora_alpha=32, 
             target_modules=target_modules,
             lora_dropout=0.1,
             bias="none", 
-            task_type="CAUSAL_LM",
+            task_type="SEQ_2_SEQ_LM",
         )
 
         self.model = get_peft_model(model, lora_config)
@@ -66,7 +66,6 @@ class GPT2FineTuner(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        print("validation step")
         input_ids = batch["input_ids"].squeeze(1)
         attention_mask = batch["attention_mask"].squeeze(1)
         labels = batch["labels"].squeeze(1)
@@ -77,7 +76,7 @@ class GPT2FineTuner(pl.LightningModule):
         generated_ids = self.model.generate(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            max_new_tokens=50,
+            max_length=512,
             num_beams=2,
         )
 

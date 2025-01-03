@@ -4,7 +4,7 @@ from datasets import load_dataset
 from transformers import AutoTokenizer, AddedToken
 
 class CNN_DailyMail_Dataset(Dataset):
-    def __init__(self, split="train", tokenizer_name="gpt2", max_input_length=512, max_target_length=128):
+    def __init__(self, split="train", tokenizer_name="facebook/bart-base", max_input_length=256, max_target_length=128):
         """
         Args:
             split (str): Which split to load ("train", "validation", or "test").

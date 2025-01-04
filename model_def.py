@@ -4,10 +4,11 @@ from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM
 from peft import LoraConfig, get_peft_model
 from evaluate import load
 from transformers import AutoTokenizer, AddedToken
+from transformers import get_linear_schedule_with_warmup
 import os 
 
 class FineTuner(pl.LightningModule):
-    def __init__(self, model_name="facebook/bart-base", lr=5e-5):
+    def __init__(self, model_name="facebook/bart-base", lr=5e-5, warmup_steps=300, total_steps=10000):
         super(FineTuner, self).__init__()
         model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
 
@@ -15,8 +16,8 @@ class FineTuner(pl.LightningModule):
             target_modules = ["q_proj", "k_proj", "v_proj", "out_proj"]
 
         lora_config = LoraConfig(
-            r=16,
-            lora_alpha=32, 
+            r=4,
+            lora_alpha=16, 
             target_modules=target_modules,
             lora_dropout=0.1,
             bias="none", 
@@ -28,6 +29,8 @@ class FineTuner(pl.LightningModule):
         self.generation_config = model.generation_config
 
         self.lr = lr
+        self.warmup_steps = warmup_steps
+        self.total_steps = total_steps
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
@@ -42,14 +45,15 @@ class FineTuner(pl.LightningModule):
     def print_trainable_parameters(self):
         self.model.print_trainable_parameters()
 
-    def forward(self, input_ids, attention_mask):
-        return self.model(input_ids, attention_mask=attention_mask, labels=input_ids)
+    def forward(self, input_ids, attention_mask, labels):
+        return self.model(input_ids, attention_mask=attention_mask, labels=labels)
 
     def training_step(self, batch, batch_idx):
         input_ids = batch["input_ids"].squeeze(1)
         attention_mask = batch["attention_mask"].squeeze(1)
-        
-        outputs = self(input_ids, attention_mask)
+        labels = batch["labels"].squeeze(1)
+
+        outputs = self(input_ids, attention_mask, labels)
         loss = outputs.loss
 
         self.log("train_loss", loss, sync_dist=True)
@@ -58,8 +62,9 @@ class FineTuner(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         input_ids = batch["input_ids"].squeeze(1)
         attention_mask = batch["attention_mask"].squeeze(1)
+        labels = batch["labels"].squeeze(1)
 
-        outputs = self(input_ids, attention_mask)
+        outputs = self(input_ids, attention_mask, labels)
         loss = outputs.loss
 
         self.log("test_loss", loss, sync_dist=True)
@@ -70,35 +75,32 @@ class FineTuner(pl.LightningModule):
         attention_mask = batch["attention_mask"].squeeze(1)
         labels = batch["labels"].squeeze(1)
 
-        outputs = self(input_ids, attention_mask)
+        outputs = self(input_ids, attention_mask, labels)
         loss = outputs.loss
-
-        generated_ids = self.model.generate(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            max_length=512,
-            num_beams=2,
-        )
-
-        preds = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-        refs = self.tokenizer.batch_decode(labels, skip_special_tokens=True)
-
-        rouge_results = self.rouge.compute(predictions=preds, references=refs)
-
-        rouge1 = rouge_results["rouge1"]
-        rouge2 = rouge_results["rouge2"]
-        rougeL = rouge_results["rougeL"]
-
-        self.log("val_rouge1", rouge1, prog_bar=True, sync_dist=True)
-        self.log("val_rouge2", rouge2, prog_bar=True, sync_dist=True)
-        self.log("val_rougeL", rougeL, prog_bar=True, sync_dist=True)
         
         self.log("val_loss", loss, prog_bar=True, sync_dist=True)
 
-        return {"val_loss": loss, "val_rouge1": rouge1, "val_rouge2": rouge2, "val_rougeL": rougeL}
+        return {"val_loss": loss}#, "val_rouge1": rouge1, "val_rouge2": rouge2, "val_rougeL": rougeL}
 
     def configure_optimizers(self):
-        return torch.optim.AdamW(self.model.parameters(), lr=self.lr)
+        # Define the optimizer
+        optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.lr)
+
+        # Define a learning rate scheduler with warmup
+        scheduler = get_linear_schedule_with_warmup(
+            optimizer,
+            num_warmup_steps=self.warmup_steps,
+            num_training_steps=self.total_steps
+        )
+
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "interval": "step",
+                "frequency": 1
+            }
+        }
 
     def prepare_inputs_for_generation(self, input_ids, **kwargs):
         return {

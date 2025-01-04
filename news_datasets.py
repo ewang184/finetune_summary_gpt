@@ -4,7 +4,7 @@ from datasets import load_dataset
 from transformers import AutoTokenizer, AddedToken
 
 class CNN_DailyMail_Dataset(Dataset):
-    def __init__(self, split="train", tokenizer_name="facebook/bart-base", max_input_length=256, max_target_length=128):
+    def __init__(self, split="train", tokenizer_name="facebook/bart-base", max_input_length=500, max_target_length=256):
         """
         Args:
             split (str): Which split to load ("train", "validation", or "test").
@@ -13,6 +13,7 @@ class CNN_DailyMail_Dataset(Dataset):
             max_target_length (int): Maximum length of target summary.
         """
         self.dataset = load_dataset("cnn_dailymail", "3.0.0", split=split)
+
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
         self.tokenizer.padding_side = "left"
         if self.tokenizer.pad_token is None:
@@ -24,11 +25,8 @@ class CNN_DailyMail_Dataset(Dataset):
         self.split = split
 
     def preprocess_text(self, article, highlights):
-        """
-        Preprocesses the text (e.g., tokenization, cleaning).
-        """
-        article = article.lower().replace("\n", " ").strip()
-        highlights = highlights.lower().replace("\n", " ").strip()
+        article = article.replace("\n", " ").strip()
+        highlights = highlights.replace("\n", " ").strip()
         return article, highlights
 
     def __len__(self):

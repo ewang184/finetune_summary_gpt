@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from news_datasets import CNN_DailyMail_Dataset
 
 # Load the checkpoint
-checkpoint_path = "/teamspace/studios/this_studio/lightning_logs/version_18/checkpoints/best-checkpoint-epoch=04-val_rougeL=0.00.ckpt"
+checkpoint_path = "/teamspace/studios/this_studio/lightning_logs/version_23/checkpoints/best-checkpoint-epoch=02-val_rougeL=0.00.ckpt"
 checkpoint = torch.load(checkpoint_path, map_location="cpu") 
 epoch = checkpoint['epoch']
 global_step = checkpoint['global_step']
@@ -46,7 +46,7 @@ model.generation_config.pad_token_id = tokenizer.pad_token_id
 dataset = CNN_DailyMail_Dataset(split="test", tokenizer_name="facebook/bart-base", max_input_length=1024, max_target_length=512)
 
 # Test loading a single sample
-sample = dataset[5]
+sample = dataset[0]
 
 inputs = sample
 

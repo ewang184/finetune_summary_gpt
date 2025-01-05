@@ -30,7 +30,7 @@ total_steps = effective_batches_per_epoch * num_epochs
 # Calculate warmup steps
 warmup_steps = int(warmup_ratio * total_steps)
 
-model = FineTuner(model_name="facebook/bart-base", lr=1e-4, warmup_steps=warmup_steps, total_steps=total_steps)
+model = FineTuner(model_name="facebook/bart-base", lr=5e-5, warmup_steps=warmup_steps, total_steps=total_steps)
 
 model.print_trainable_parameters()
 

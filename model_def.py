@@ -14,9 +14,9 @@ class FineTuner(pl.LightningModule):
 
         if "facebook/bart" in model_name:
             target_modules = ["q_proj", "k_proj", "v_proj", "out_proj"]
-
+            
         lora_config = LoraConfig(
-            r=4,
+            r=8,
             lora_alpha=16, 
             target_modules=target_modules,
             lora_dropout=0.1,
